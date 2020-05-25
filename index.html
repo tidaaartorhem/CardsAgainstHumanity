@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Game</title>
+        <!-- <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous"> -->
+
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous" />
+</head>
+
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="col-lg-6 offset-lg-3">
+
+                <div v-if="ready">
+                    <p v-for="user in info">
+                        {{user.username}} {{user.type}}
+                    </p>
+                </div>
+
+                <div v-if="!ready">
+                    <h4>Enter your username</h4>
+                    <form @submit.prevent="addUser">
+                        <div class="form-group row">
+                            <input type="text" class="form-control col-9" v-model="username"
+                                placeholder="Enter username here">
+                            <input type="submit" value="Join" class="btn btn-sm btn-info ml-1">
+
+                        </div>
+                    </form>
+                </div>
+                <h2 v-else>{{username}}</h2>
+                <div class="card bg-info" v-if="ready">
+                    <div class="card-header text-white">
+                        <h4>Game <span class="float-right">{{connections}} connections</span></h4>
+                    </div>
+                    <ul class="list-group list-group-flush text-right">
+                        <small v-if="typing" class="text-white">{{typing}} is typing</small>
+                        <li class="list-group-item" v-for="message in messages">
+                            <span :class="{'float-left':message.type === 1}">
+                                {{message.message}}
+                                <small>:{{message.user}}</small>
+                            </span>
+                        </li>
+                    </ul>
+
+                    <div class="card-body">
+                        <form @submit.prevent="send">
+                            <div class="form-group">
+                                <input type="text" class="form-control" v-model="newMessage"
+                                    placeholder="Enter message here">
+                            </div>
+                        </form>
+                    </div>
+                   
+                </div>
+               
+                <button @click='deal' style='margin:3rem;' v-if="ready" class=button>
+                        Play Game
+                </button>
+            
+                <div v-if='showCard' class="container">
+                        <div class="row">
+                                <div class="col-8">{{question}}</div>
+                                <div class="col">  <button @click='newQuestion'> Next Question </button>
+                                </div>
+                                
+                        </div>
+                
+                        <div class="row">
+                          
+                                  
+                          <div @click='chooseA(item)'  v-bind:key='item' v-for='item in cards'  >
+                                <div class="col">
+                             <div style="width: 9rem;  margin:1rem; height: 13rem;" class="card"> <h5 class="card-title">{{item.data}}</h5></div> </div>
+
+                         </div>
+
+                        </div>
+
+                       
+                        
+            </div>
+<div v-if='loading' class="row"> Loading ... </div>
+    <div v-if='hideCard'>
+        
+            <div class="row">
+                    <div class="col-8">{{question}}</div>
+                    <div class="col">  <button @click='newQuestion'> Next Question </button>
+                    </div>
+                    
+            </div>
+            <div class="row">
+                    <h4>Submitted Answers....</h4>
+                </div>
+
+        <div class="row">
+               
+          <div @click='judge(point)' v-bind:key='point' v-for='point in choseCards'  >
+             
+                <div class="col">
+             <div style="width: 9rem;  margin:1rem; height: 13rem;" class="card"> <h5 class="card-title">{{point[0].data}}</h5></div> </div>
+
+         </div>
+
+    </div>
+
+        </div>
+        <div v-if='seeWinner'>
+                <div class="row">
+                        <div class="col-8">{{question}}</div>
+                        <div class="col">  <button @click='newQuestion'> Next Question </button>
+                        </div>
+                        
+                </div>
+            <div class="row">
+                <div class="col-sm-6">
+         <h1>Winner    {{winner[0].user}} <br /> {{winner[0].data}}</h1> 
+         
+     
+    
+             </div>
+    
+        </div>
+    
+            </div>
+    </div>
+
+
+<!-- The core Firebase JS SDK is always required and must be listed first -->
+<script src="/__/firebase/7.14.5/firebase-app.js"></script>
+
+<!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+
+<!-- Initialize Firebase -->
+<script src="/__/firebase/init.js"></script>
+</body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+    var i = 0;
+    var socket = io();
+    let vue = new Vue({
+        el: '#app',
+
+        data: {
+            newMessage: null,
+            loading:false, 
+            choseCards:[],
+           win:false, 
+           question:'', 
+            messages: [],
+            typing: false,
+            showCard:false, 
+            hideCard:false, 
+            username: null,
+            ready: false,
+            info: [],
+            connections: 0,
+            cards:[],
+            qucards:[],
+            currentq:[],
+            winner:[],
+            seeWinner:false
+        },
+
+        created() {
+            window.onbeforeunload = () => {
+                socket.emit('leave', this.username);
+            }
+            socket.on('Winner',(data,value)=>{
+                this.hideCard = false; 
+                    this.seeWinner = true; 
+
+this.winner = data; 
+this.setCards(value);
+
+
+
+
+})
+           
+            socket.on('questions', (data) => {
+                   console.log(data)
+                    this.currentq = data;
+                    this.question = this.currentq[0].text; 
+            });
+
+            socket.on('answer', (data)=>{
+this.setCards(data);
+            })
+            socket.on('chat-message', (data) => {
+                this.messages.push({
+                    message: data.message,
+                    type: 1,
+                    user: data.user,
+                });
+            });
+
+            socket.on('typing', (data) => {
+                this.typing = data;
+            });
+
+
+            socket.on('stopTyping', () => {
+                this.typing = false;
+            });
+
+            socket.on('joined', (data) => {
+                this.info.push({
+                    username: data,
+                    type: 'joined'
+                });
+
+                setTimeout(() => {
+                    this.info = [];
+                }, 5000);
+            });
+
+            socket.on('leave', (data) => {
+                this.info.push({
+                    username: data,
+                    type: 'left'
+                });
+
+                setTimeout(() => {
+                    this.info = [];
+                }, 5000);
+            });
+
+            socket.on('connections', (data) => {
+                this.connections = data;
+            });
+        },
+
+        watch: {
+            newMessage(value) {
+                value ? socket.emit('typing', this.username) : socket.emit('stopTyping')
+            }
+//             chosenCards: function (value) {
+            
+            
+//                 if(value.length == this.connections ){
+//  this.hideCard = true; 
+//       this.loading = false;
+    
+//     }
+      
+      
+    }, 
+           
+       
+
+        methods: {
+
+            setCards(data){
+
+
+
+     if(this.cards.length<5) {
+
+        this.cards.push(data[Math.floor((Math.random() * data.length) + 1)])
+this.setCards(data)
+     }
+//                 var m=0;
+
+// while (m<temp.length){
+//     this.cards.push(data[Math.floor((Math.random() * data.length) + 1)])
+//     m++;
+// }
+            },
+
+            newQuestion(){
+
+
+i++;  
+if(i<10)       {
+this.question = this.currentq[i].text}
+
+this.showCard = true ; 
+this.seeWinner= false;
+this.hideCard = false; 
+
+
+
+
+            },
+            send() {
+                this.messages.push({
+                    message: this.newMessage,
+                    type: 0,
+                    user: 'Me',
+                });
+
+                socket.emit('chat-message', {
+                    message: this.newMessage,
+                    user: this.username
+                });
+                this.newMessage = null;
+            },
+
+            addUser() {
+                this.ready = true;
+                socket.emit('joined', this.username)
+            },
+
+            deal(){
+this.showCard = true; 
+            },
+            chooseA(val){
+                
+                this.showCard=false; 
+   this.loading = true; 
+
+var sortedAns = [];
+
+
+
+sortedAns.push({
+    user:this.username,
+   data:val.data,
+   Index:val.Index
+})
+
+var temp =[]
+for(var l =0; l<sortedAns.length;l++){
+
+for (var j=0; j<this.cards.length;j++){
+
+    if(this.cards[j].Index == sortedAns[l].Index){
+  
+     
+
+    }
+    else{
+        temp.push(this.cards[j])
+    }
+
+}
+}
+
+this.cards = temp; 
+
+
+    socket.emit('Chosen',sortedAns)
+
+    socket.on('Decision',(data,users)=>{
+
+
+this.choseCards=data;
+console.log(this.choseCards.length)
+if(this.choseCards.length == users ){
+ this.hideCard = true; 
+      this.loading = false;
+    
+    }
+
+
+
+
+
+    })
+
+              
+     
+            },
+
+            judge(val){
+
+               
+                socket.emit('judge', val)
+
+               
+
+
+
+
+
+
+            },
+           
+        },
+
+    });
+</script>
+<style>
+
+#cards {
+  /* Add shadows to create the "card" effect */
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+  transition: 0.3s;
+  height: 20rem;
+}
+
+/* On mouse-over, add a deeper shadow */
+#card:hover {
+  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+}
+
+</style>
+</html>

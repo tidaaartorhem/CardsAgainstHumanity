@@ -1,0 +1,15 @@
+{
+  "name": "cardsagainsthumanitysocket.io",
+  "version": "1.0.0",
+  "description": "Cards Against Humanity with Socket.io",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Aadit Mehrotra",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.4",
+    "socket.io": "^2.2.0"
+  }
+}
